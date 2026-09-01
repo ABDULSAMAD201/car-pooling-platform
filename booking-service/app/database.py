@@ -10,7 +10,10 @@ from app.config import settings
 
 def get_engine() -> Engine:
     db_url = settings.DATABASE_URL
-    engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
+    engine_kwargs: dict[str, object] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
     if db_url.startswith("sqlite"):
         engine_kwargs["connect_args"] = {"check_same_thread": False}
     return create_engine(db_url, **engine_kwargs)

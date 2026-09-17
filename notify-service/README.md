@@ -16,3 +16,4 @@ later inside app/routers/notify.py without touching anything else.
 6. uvicorn app.main:app --reload --port 8002
 7. Open http://localhost:8002/docs to test it in Swagger UI, or
    http://localhost:8002/health to check the DB connection.
+8. CI/CD completed

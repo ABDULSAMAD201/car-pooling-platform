@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
@@ -12,7 +12,6 @@ jobs:
     strategy:
       matrix:
         service: [booking-service, matching-service, notify-service]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -30,14 +29,7 @@ jobs:
       - name: Run tests
         working-directory: ${{ matrix.service }}
         env:
-          # Dummy value — tests use an in-memory SQLite override and never
-          # actually connect to this. It only needs to exist so Settings()
-          # doesn't fail validation when the app module loads in CI.
           DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
-
-          # Make the current service directory available for Python imports.
-          PYTHONPATH: .
-
         run: pytest
 
       - name: Log in to Docker Hub
@@ -54,3 +46,22 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+
+  deploy:
+    needs: test-and-build
+    if: github.event_name == 'push'
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        include:
+          - service: booking-service
+            deployment: booking-deployment
+          - service: matching-service
+            deployment: matching-deployment
+          - service: notify-service
+            deployment: notify-deployment
+    steps:
+      - name: Roll out the new image
+        run: |
+          kubectl set image deployment/${{ matrix.deployment }} ${{ matrix.service }}=${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+          kubectl rollout status deployment/${{ matrix.deployment }}

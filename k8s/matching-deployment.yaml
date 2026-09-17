@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: matching-service
-          image: matching-service:v1
-          imagePullPolicy: Never
+          image: abdulsamad099/matching-service:latest
+          imagePullPolicy: Always  # now pulling from Docker Hub, refreshed by CD on every deploy
           resources:
             requests:
               cpu: 100m

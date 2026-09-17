@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: booking-service
-          image: booking-service:v1
-          imagePullPolicy: Never   # image is local, loaded via `minikube image load` — never try to pull it
+          image: abdulsamad099/booking-service:latest
+          imagePullPolicy: Always  # now pulling from Docker Hub, refreshed by CD on every deploy
           resources:
             requests:
               cpu: 100m

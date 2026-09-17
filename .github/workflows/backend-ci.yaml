@@ -1,3 +1,4 @@
+```yaml
 name: Backend CI
 
 on:
@@ -12,6 +13,7 @@ jobs:
     strategy:
       matrix:
         service: [booking-service, matching-service, notify-service]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -33,13 +35,17 @@ jobs:
           # actually connect to this. It only needs to exist so Settings()
           # doesn't fail validation when the app module loads in CI.
           DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
+
+          # Make the current service directory available for Python imports.
+          PYTHONPATH: .
+
         run: pytest
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.abdulsamad099 }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push image
@@ -49,3 +55,4 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+```

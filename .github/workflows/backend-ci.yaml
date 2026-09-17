@@ -30,7 +30,7 @@ jobs:
         working-directory: ${{ matrix.service }}
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
-        run: pytest
+        run: python -m pytest
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push'

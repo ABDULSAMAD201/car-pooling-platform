@@ -24,6 +24,8 @@ async def create_match(payload: RideRequest, session: Session = Depends(get_sess
             "driver_id": driver.driver_id,
             "current_lat": driver.current_lat,
             "current_lng": driver.current_lng,
+            "destination_lat": driver.destination_lat,
+            "destination_lng": driver.destination_lng,
             "available_from": driver.available_from,
             "available_to": driver.available_to,
         }

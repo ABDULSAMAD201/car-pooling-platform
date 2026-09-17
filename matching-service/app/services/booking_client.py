@@ -17,7 +17,7 @@ async def update_booking_status(ride_id: str, *, matched: bool, driver_id: str |
     }
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.patch(f"{settings.BOOKING_SERVICE_URL}/rides/{ride_id}/status", json=payload)
             response.raise_for_status()
     except (httpx.HTTPError, httpx.TimeoutException) as exc:

@@ -13,6 +13,8 @@ class DriverAvailability(SQLModel, table=True):
     driver_id: str = Field(index=True)
     current_lat: float
     current_lng: float
+    destination_lat: float
+    destination_lng: float
     is_active: bool = Field(default=True, index=True)
     available_from: datetime | None = None
     available_to: datetime | None = None

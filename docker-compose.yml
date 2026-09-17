@@ -1,0 +1,29 @@
+services:
+  booking-service:
+    build: ./booking-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./booking-service/.env.example
+    environment:
+      MATCHING_SERVICE_URL: http://matching-service:8001
+      NOTIFY_SERVICE_URL: http://notify-service:8002
+    depends_on:
+      - matching-service
+      - notify-service
+
+  matching-service:
+    build: ./matching-service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./matching-service/.env.example
+    environment:
+      BOOKING_SERVICE_URL: http://booking-service:8000
+
+  notify-service:
+    build: ./notify-service
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./notify-service/.env.example

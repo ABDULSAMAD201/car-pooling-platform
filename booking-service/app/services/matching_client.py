@@ -18,7 +18,7 @@ async def create_match_request(ride_id: str, origin: dict[str, float], destinati
         "time": time,
     }
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(f"{settings.MATCHING_SERVICE_URL}/match", json=payload)
             response.raise_for_status()
     except (httpx.HTTPError, httpx.TimeoutException) as exc:

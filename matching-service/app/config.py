@@ -13,6 +13,13 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql://neondb_owner:REDACTED@ep-bold-tooth-aepz4etm.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require"
     BOOKING_SERVICE_URL: str = "http://localhost:8000"
+    CORS_ORIGINS: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if not self.CORS_ORIGINS:
+            return ["http://localhost:3000"]
+        return [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip()]
 
 
 settings = Settings()

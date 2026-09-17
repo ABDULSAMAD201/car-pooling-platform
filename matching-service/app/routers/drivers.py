@@ -23,6 +23,8 @@ async def register_driver_availability(payload: DriverAvailabilityCreate, sessio
             driver_id=payload.driver_id,
             current_lat=payload.current_lat,
             current_lng=payload.current_lng,
+            destination_lat=payload.destination_lat,
+            destination_lng=payload.destination_lng,
             is_active=True,
             available_from=payload.available_from,
             available_to=payload.available_to,
@@ -33,6 +35,8 @@ async def register_driver_availability(payload: DriverAvailabilityCreate, sessio
     else:
         availability.current_lat = payload.current_lat
         availability.current_lng = payload.current_lng
+        availability.destination_lat = payload.destination_lat
+        availability.destination_lng = payload.destination_lng
         availability.is_active = True
         availability.available_from = payload.available_from
         availability.available_to = payload.available_to

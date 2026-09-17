@@ -24,6 +24,8 @@ class DriverAvailabilityCreate(BaseModel):
     driver_id: str
     current_lat: float
     current_lng: float
+    destination_lat: float
+    destination_lng: float
     available_from: datetime | None = None
     available_to: datetime | None = None
 
@@ -35,6 +37,8 @@ class DriverAvailabilityResponse(BaseModel):
     driver_id: str
     current_lat: float
     current_lng: float
+    destination_lat: float
+    destination_lng: float
     is_active: bool
     available_from: datetime | None = None
     available_to: datetime | None = None
@@ -48,6 +52,8 @@ class DriverAvailabilityResponse(BaseModel):
             driver_id=driver.driver_id,
             current_lat=driver.current_lat,
             current_lng=driver.current_lng,
+            destination_lat=driver.destination_lat,
+            destination_lng=driver.destination_lng,
             is_active=driver.is_active,
             available_from=driver.available_from,
             available_to=driver.available_to,

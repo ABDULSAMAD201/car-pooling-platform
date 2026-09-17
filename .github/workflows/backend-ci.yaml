@@ -1,4 +1,3 @@
-```yaml
 name: Backend CI
 
 on:
@@ -55,4 +54,3 @@ jobs:
           context: ./${{ matrix.service }}
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
-```

@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Ride, RideStatus
+from app.models import Ride, RideStatus, User
+from app.routers.auth import get_current_user, get_optional_user
 from app.schemas import RideCreateRequest, RideResponse, RideStatusUpdate
 from app.services.matching_client import create_match_request
 from app.services.notify_client import send_notification
@@ -20,9 +21,18 @@ def _serialize_ride(ride: Ride) -> RideResponse:
 
 
 @router.post("", response_model=RideResponse, status_code=status.HTTP_201_CREATED)
-async def create_ride(payload: RideCreateRequest, session: Session = Depends(get_session)) -> RideResponse:
+async def create_ride(
+    payload: RideCreateRequest,
+    session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> RideResponse:
+    # When a caller is signed in we ignore any user_id in the body and attribute
+    # the ride to the account, so one user cannot book on another's behalf.
+    # Anonymous callers keep the original user_id behaviour.
+    owner_id = str(current_user.id) if current_user is not None else payload.user_id
+
     ride = Ride(
-        user_id=payload.user_id,
+        user_id=owner_id,
         origin_lat=payload.origin.lat,
         origin_lng=payload.origin.lng,
         destination_lat=payload.destination.lat,
@@ -44,6 +54,21 @@ async def create_ride(payload: RideCreateRequest, session: Session = Depends(get
     )
 
     return _serialize_ride(ride)
+
+
+@router.get("/mine", response_model=list[RideResponse])
+async def list_my_rides(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> list[RideResponse]:
+    """Every ride belonging to the signed-in account, newest first."""
+    statement = (
+        select(Ride)
+        .where(Ride.user_id == str(current_user.id))
+        .order_by(Ride.created_at.desc())
+    )
+    rides = session.exec(statement).all()
+    return [_serialize_ride(ride) for ride in rides]
 
 
 @router.get("/{ride_id}", response_model=RideResponse)

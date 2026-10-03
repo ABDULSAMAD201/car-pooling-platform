@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
+import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
-  title: "Carpool Ride Request",
+  title: {
+    default: "Carpool — share rides, split costs",
+    template: "%s · Carpool",
+  },
   description:
-    "Request a carpool ride — frontend for the carpool backend resilience engineering project.",
+    "Request a carpool ride, register as a driver, and track your trips in real time.",
 };
 
 export default function RootLayout({
@@ -14,7 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

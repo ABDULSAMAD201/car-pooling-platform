@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Keep the map visually consistent with the light UI. */
+  .leaflet-container {
+    @apply bg-slate-100 font-sans;
+  }
+
+  .leaflet-control-attribution {
+    @apply bg-white/80 text-[10px] text-slate-500;
+  }
+
+  .leaflet-tooltip {
+    @apply rounded-md border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm;
+  }
+
+  .leaflet-tooltip-top::before {
+    @apply border-t-white;
+  }
+}
+
+/* Subtle fade-in used by page-level transitions. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.25s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+  }
+}

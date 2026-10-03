@@ -1,5 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const MATCHING_API_URL = process.env.NEXT_PUBLIC_MATCHING_API_URL;
+const NOTIFY_API_URL = process.env.NEXT_PUBLIC_NOTIFY_API_URL;
 
 export interface LatLng {
   lat: number;
@@ -40,6 +41,8 @@ export interface DriverAvailabilityCreate {
   current_lng: number;
   destination_lat: number;
   destination_lng: number;
+  available_from?: string | null;
+  available_to?: string | null;
 }
 
 export interface DriverAvailability {
@@ -56,6 +59,39 @@ export interface DriverAvailability {
   updated_at: string;
 }
 
+export type UserRole = "rider" | "driver" | "both";
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  role: UserRole;
+  home_lat: number | null;
+  home_lng: number | null;
+  home_label: string;
+  vehicle_make: string;
+  vehicle_model: string;
+  vehicle_color: string;
+  vehicle_plate: string;
+  seats_offered: number;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface Notification {
+  id: number;
+  user_id: string;
+  ride_id: string | null;
+  message: string;
+  created_at: string;
+}
+
 export class ApiError extends Error {
   readonly status?: number;
 
@@ -66,35 +102,59 @@ export class ApiError extends Error {
   }
 }
 
-function bookingBaseUrl(): string {
-  if (!API_URL) {
+function normalizeBaseUrl(value: string | undefined, name: string): string {
+  if (!value) {
     throw new ApiError(
-      "NEXT_PUBLIC_API_URL is not set. Copy .env.local.example to .env.local and set the backend URL."
+      `${name} is not set. Copy .env.local.example to .env.local and set the backend URL.`
     );
   }
-  return API_URL.replace(/\/+$/, "");
+  return value.replace(/\/+$/, "");
+}
+
+function bookingBaseUrl(): string {
+  return normalizeBaseUrl(API_URL, "NEXT_PUBLIC_API_URL");
 }
 
 function matchingBaseUrl(): string {
-  if (!MATCHING_API_URL) {
-    throw new ApiError(
-      "NEXT_PUBLIC_MATCHING_API_URL is not set. Copy .env.local.example to .env.local and set the matching service URL."
-    );
-  }
-  return MATCHING_API_URL.replace(/\/+$/, "");
+  return normalizeBaseUrl(MATCHING_API_URL, "NEXT_PUBLIC_MATCHING_API_URL");
 }
 
-async function request<T>(path: string, init?: RequestInit, base: string = bookingBaseUrl()): Promise<T> {
+function notifyBaseUrl(): string {
+  return normalizeBaseUrl(NOTIFY_API_URL, "NEXT_PUBLIC_NOTIFY_API_URL");
+}
+
+/** Token supplied by the auth context; read lazily so it is never stale. */
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  base: string = bookingBaseUrl(),
+  options: { auth?: boolean } = {}
+): Promise<T> {
+  const useAuth = options.auth ?? false;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+
+  if (useAuth && authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-    });
+    response = await fetch(`${base}${path}`, { ...init, headers });
   } catch {
-    throw new ApiError(
-      `Could not reach the backend at ${base}. Is the service running?`
-    );
+    throw new ApiError(`Could not reach the backend at ${base}. Is the service running?`);
   }
 
   if (!response.ok) {
@@ -103,6 +163,14 @@ async function request<T>(path: string, init?: RequestInit, base: string = booki
       const body = await response.json();
       if (typeof body?.detail === "string") {
         message = body.detail;
+      } else if (Array.isArray(body?.detail)) {
+        // FastAPI validation errors arrive as a list of field errors.
+        message = body.detail
+          .map((item: { msg?: string; loc?: (string | number)[] }) => {
+            const field = item.loc?.filter((part) => part !== "body").join(".");
+            return field ? `${field}: ${item.msg}` : (item.msg ?? "Invalid value");
+          })
+          .join(" ");
       } else if (body?.detail != null) {
         message = JSON.stringify(body.detail);
       }
@@ -112,15 +180,36 @@ async function request<T>(path: string, init?: RequestInit, base: string = booki
     throw new ApiError(message, response.status);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return (await response.json()) as T;
 }
 
 export async function createRide(payload: CreateRideRequest): Promise<Ride> {
-  return request<Ride>("/rides", { method: "POST", body: JSON.stringify(payload) });
+  return request<Ride>("/rides", { method: "POST", body: JSON.stringify(payload) }, undefined, {
+    auth: true,
+  });
 }
 
 export async function fetchRide(rideId: string): Promise<Ride> {
-  return request<Ride>(`/rides/${encodeURIComponent(rideId)}`);
+  return request<Ride>(`/rides/${encodeURIComponent(rideId)}`, undefined, undefined, {
+    auth: true,
+  });
+}
+
+export async function fetchMyRides(): Promise<Ride[]> {
+  return request<Ride[]>("/rides/mine", undefined, undefined, { auth: true });
+}
+
+export async function cancelRide(rideId: string): Promise<Ride> {
+  return request<Ride>(
+    `/rides/${encodeURIComponent(rideId)}/cancel`,
+    { method: "PATCH" },
+    undefined,
+    { auth: true }
+  );
 }
 
 export async function fetchMatchResult(rideId: string): Promise<MatchResult> {
@@ -138,5 +227,59 @@ export async function registerDriverAvailability(
     "/drivers/availability",
     { method: "POST", body: JSON.stringify(payload) },
     matchingBaseUrl()
+  );
+}
+
+export async function fetchDriverAvailability(
+  activeOnly = true
+): Promise<DriverAvailability[]> {
+  return request<DriverAvailability[]>(
+    `/drivers/availability?active_only=${activeOnly}`,
+    undefined,
+    matchingBaseUrl()
+  );
+}
+
+export async function register(payload: {
+  email: string;
+  password: string;
+  full_name?: string;
+  phone?: string;
+  role?: UserRole;
+}): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function login(payload: {
+  email: string;
+  password: string;
+}): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchMe(): Promise<User> {
+  return request<User>("/auth/me", undefined, undefined, { auth: true });
+}
+
+export async function updateProfile(changes: Partial<User>): Promise<User> {
+  return request<User>(
+    "/auth/me",
+    { method: "PATCH", body: JSON.stringify(changes) },
+    undefined,
+    { auth: true }
+  );
+}
+
+export async function fetchNotifications(userId: string): Promise<Notification[]> {
+  return request<Notification[]>(
+    `/notifications/${encodeURIComponent(userId)}`,
+    undefined,
+    notifyBaseUrl()
   );
 }

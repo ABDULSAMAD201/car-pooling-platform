@@ -1,107 +1,128 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   registerDriverAvailability,
   type DriverAvailability,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import type { LatLng } from "@/lib/geo";
+import { ClientOnlyMap, type PickTarget } from "@/components/location-map";
+import { RequirePortal } from "@/components/portal-guard";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHeader,
+  Field,
+  Input,
+  PageHeader,
+} from "@/components/ui";
 
-const inputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
+function formatCoords(point: LatLng): string {
+  return `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
 }
 
-function LatLngInputs({
-  latLabel,
-  lngLabel,
-  lat,
-  lng,
-  onLatChange,
-  onLngChange,
-}: {
-  latLabel: string;
-  lngLabel: string;
-  lat: string;
-  lng: string;
-  onLatChange: (value: string) => void;
-  onLngChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <Field label={latLabel}>
-        <input
-          type="number"
-          step="any"
-          required
-          placeholder="e.g. 24.8620"
-          value={lat}
-          onChange={(event) => onLatChange(event.target.value)}
-          className={inputClass}
-        />
-      </Field>
-      <Field label={lngLabel}>
-        <input
-          type="number"
-          step="any"
-          required
-          placeholder="e.g. 67.0020"
-          value={lng}
-          onChange={(event) => onLngChange(event.target.value)}
-          className={inputClass}
-        />
-      </Field>
-    </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <span
-      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-      aria-hidden="true"
-    />
-  );
-}
-
+/** Driver-only entry point; passengers are redirected to their own portal. */
 export default function DriverPage() {
-  const [driverId, setDriverId] = useState("");
-  const [currentLat, setCurrentLat] = useState("");
-  const [currentLng, setCurrentLng] = useState("");
-  const [destLat, setDestLat] = useState("");
-  const [destLng, setDestLng] = useState("");
+  return (
+    <RequirePortal portal="driver">
+      <DriverAvailability />
+    </RequirePortal>
+  );
+}
+
+function DriverAvailability() {
+  const router = useRouter();
+  const { user, loading: authLoading, updateProfile } = useAuth();
+
+  const [current, setCurrent] = useState<LatLng | null>(null);
+  const [destination, setDestination] = useState<LatLng | null>(null);
+  const [pickTarget, setPickTarget] = useState<PickTarget>("current");
+
+  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleColor, setVehicleColor] = useState("");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [seats, setSeats] = useState("3");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [registered, setRegistered] = useState<DriverAvailability | null>(null);
 
+  // Hydrate the vehicle fields from the saved profile.
+  useEffect(() => {
+    if (!user) return;
+    setVehicleMake(user.vehicle_make ?? "");
+    setVehicleModel(user.vehicle_model ?? "");
+    setVehicleColor(user.vehicle_color ?? "");
+    setVehiclePlate(user.vehicle_plate ?? "");
+    setSeats(String(user.seats_offered ?? 3));
+    setCurrent((existing) =>
+      existing ?? (user.home_lat != null && user.home_lng != null
+        ? { lat: user.home_lat, lng: user.home_lng }
+        : null)
+    );
+  }, [user]);
+
+  const handlePick = useCallback((target: PickTarget, point: LatLng) => {
+    if (target === "current") setCurrent(point);
+    else if (target === "destination") setDestination(point);
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setRegistered(null);
+
+    if (!user) {
+      router.push("/login?next=/driver");
+      return;
+    }
+    if (!current || !destination) {
+      setError("Set both your current position and your destination on the map.");
+      return;
+    }
+
+    const seatsNumber = Number(seats);
+    if (!Number.isInteger(seatsNumber) || seatsNumber < 1 || seatsNumber > 8) {
+      setError("Seats offered must be between 1 and 8.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const driver = await registerDriverAvailability({
-        driver_id: driverId.trim(),
-        current_lat: Number(currentLat),
-        current_lng: Number(currentLng),
-        destination_lat: Number(destLat),
-        destination_lng: Number(destLng),
+      // Persist the vehicle details so the driver dashboard can show them.
+      if (
+        vehicleMake !== (user.vehicle_make ?? "") ||
+        vehicleModel !== (user.vehicle_model ?? "") ||
+        vehicleColor !== (user.vehicle_color ?? "") ||
+        vehiclePlate !== (user.vehicle_plate ?? "") ||
+        seatsNumber !== user.seats_offered
+      ) {
+        await updateProfile({
+          vehicle_make: vehicleMake.trim(),
+          vehicle_model: vehicleModel.trim(),
+          vehicle_color: vehicleColor.trim(),
+          vehicle_plate: vehiclePlate.trim(),
+          seats_offered: seatsNumber,
+          role: user.role === "rider" ? "both" : user.role,
+        });
+      }
+
+      const result = await registerDriverAvailability({
+        driver_id: user.id,
+        current_lat: current.lat,
+        current_lng: current.lng,
+        destination_lat: destination.lat,
+        destination_lng: destination.lng,
       });
-      setRegistered(driver);
+      setRegistered(result);
     } catch (submitError) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "Failed to register driver availability."
+        submitError instanceof Error ? submitError.message : "Could not register availability."
       );
     } finally {
       setSubmitting(false);
@@ -109,100 +130,188 @@ export default function DriverPage() {
   }
 
   return (
-    <main className="flex min-h-screen justify-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-lg self-start rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <p className="text-sm">
-          <Link href="/" className="text-slate-500 hover:text-slate-800">
-            ← Back to ride request
-          </Link>
-        </p>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900">Driver availability</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Tell the matching service where you are and where you&apos;re headed. Rides
-          starting within 5 km and heading the same way can be matched to you.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <Field label="Driver ID">
-            <input
-              type="text"
-              required
-              placeholder="e.g. driver-7"
-              value={driverId}
-              onChange={(event) => setDriverId(event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <LatLngInputs
-            latLabel="Current latitude"
-            lngLabel="Current longitude"
-            lat={currentLat}
-            lng={currentLng}
-            onLatChange={setCurrentLat}
-            onLngChange={setCurrentLng}
-          />
-
-          <LatLngInputs
-            latLabel="Destination latitude"
-            lngLabel="Destination longitude"
-            lat={destLat}
-            lng={destLng}
-            onLatChange={setDestLat}
-            onLngChange={setDestLng}
-          />
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting && <Spinner />}
-            {submitting ? "Registering…" : "Register availability"}
-          </button>
-        </form>
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700"
-          >
-            {error}
-          </p>
-        )}
-
-        {registered && (
-          <div className="mt-4 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            <p className="font-medium text-emerald-800">Driver registered</p>
-            <p className="mt-1.5 break-all">
-              <span className="text-emerald-700">Driver ID:</span>{" "}
-              <span className="font-mono">{registered.driver_id}</span>
-            </p>
-            <p className="mt-1">
-              <span className="text-emerald-700">Location:</span>{" "}
-              <span className="font-mono">
-                {registered.current_lat}, {registered.current_lng}
-              </span>{" "}
-              →{" "}
-              <span className="font-mono">
-                {registered.destination_lat}, {registered.destination_lng}
-              </span>
-            </p>
-            <p className="mt-1">
-              <span className="text-emerald-700">Status:</span>{" "}
-              {registered.is_active ? (
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                  active
-                </span>
-              ) : (
-                <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                  inactive
-                </span>
-              )}
-            </p>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Driver availability"
+        description="Tell us where you are and where you're headed. Rides starting within 5 km and heading the same way can be matched to you."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/driver/nearby">
+              <Button variant="secondary">Drivers nearby</Button>
+            </Link>
+            <Link href="/driver/dashboard">
+              <Button variant="secondary">Driver dashboard →</Button>
+            </Link>
           </div>
-        )}
+        }
+      />
+
+      {!user && !authLoading && (
+        <div className="mb-4">
+          <Alert variant="info">
+            <Link href="/login?next=/driver" className="font-semibold underline">
+              Sign in
+            </Link>{" "}
+            to register availability and get matched with riders.
+          </Alert>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+        <Card className="overflow-hidden">
+          <ClientOnlyMap
+            className="h-[420px] w-full sm:h-[520px]"
+            driver={current ? { ...current, label: "You are here" } : null}
+            destination={destination ? { ...destination, label: "Headed to" } : null}
+            onPick={handlePick}
+            activeTarget={pickTarget}
+          />
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 p-4">
+            <Button
+              size="sm"
+              variant={pickTarget === "current" ? "primary" : "secondary"}
+              onClick={() => setPickTarget("current")}
+            >
+              {current ? "Change current position" : "Set current position"}
+            </Button>
+            <Button
+              size="sm"
+              variant={pickTarget === "destination" ? "primary" : "secondary"}
+              onClick={() => setPickTarget("destination")}
+            >
+              {destination ? "Change destination" : "Set destination"}
+            </Button>
+            {current && (
+              <Button size="sm" variant="ghost" onClick={() => setCurrent(null)}>
+                Clear position
+              </Button>
+            )}
+            {destination && (
+              <Button size="sm" variant="ghost" onClick={() => setDestination(null)}>
+                Clear destination
+              </Button>
+            )}
+          </div>
+        </Card>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Your route" />
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50/60 p-3">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white">
+                  C
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
+                    Current position
+                  </p>
+                  <p className="truncate font-mono text-xs text-slate-900">
+                    {current ? formatCoords(current) : "Click the map to set"}
+                  </p>
+                </div>
+              </div>
+              <div className="ml-3 h-3 w-px bg-slate-300" />
+              <div className="flex items-start gap-3 rounded-lg border border-indigo-300 bg-indigo-50/60 p-3">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                  B
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                    Destination
+                  </p>
+                  <p className="truncate font-mono text-xs text-slate-900">
+                    {destination ? formatCoords(destination) : "Click the map to set"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Vehicle" description="Shown to riders when you're matched." />
+            <form onSubmit={handleSubmit} className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Make" htmlFor="make">
+                  <Input
+                    id="make"
+                    placeholder="Toyota"
+                    value={vehicleMake}
+                    onChange={(event) => setVehicleMake(event.target.value)}
+                  />
+                </Field>
+                <Field label="Model" htmlFor="model">
+                  <Input
+                    id="model"
+                    placeholder="Corolla"
+                    value={vehicleModel}
+                    onChange={(event) => setVehicleModel(event.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Colour" htmlFor="color">
+                  <Input
+                    id="color"
+                    placeholder="Silver"
+                    value={vehicleColor}
+                    onChange={(event) => setVehicleColor(event.target.value)}
+                  />
+                </Field>
+                <Field label="Plate" htmlFor="plate">
+                  <Input
+                    id="plate"
+                    placeholder="ABC-1234"
+                    value={vehiclePlate}
+                    onChange={(event) => setVehiclePlate(event.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Seats offered" htmlFor="seats" hint="1–8 passengers.">
+                <Input
+                  id="seats"
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={seats}
+                  onChange={(event) => setSeats(event.target.value)}
+                />
+              </Field>
+
+              {error && <Alert>{error}</Alert>}
+
+              <Button
+                type="submit"
+                size="lg"
+                loading={submitting}
+                disabled={!user}
+                className="w-full"
+              >
+                {submitting ? "Registering…" : "Go online"}
+              </Button>
+            </form>
+          </Card>
+
+          {registered && (
+            <Card className="animate-fade-in-up border-emerald-200 p-5">
+              <p className="text-sm font-semibold text-emerald-800">You're online</p>
+              <p className="mt-1 text-sm text-emerald-700">
+                Riders heading your way within 5 km can now be matched to you.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3 w-full"
+                onClick={() => router.push("/driver/dashboard")}
+              >
+                Open dashboard
+              </Button>
+            </Card>
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

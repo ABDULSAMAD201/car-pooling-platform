@@ -6,11 +6,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
   cancelRide,
+  fetchInterestedDrivers,
   fetchMatchResult,
   fetchRide,
+  pickDriver,
+  type DriverCandidate,
   type MatchResult,
   type Ride,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { ClientOnlyMap } from "@/components/location-map";
 import {
   Alert,
@@ -26,7 +30,7 @@ const POLL_INTERVAL_MS = 5000;
 const TIMELINE = [
   { key: "requested", label: "Ride requested", description: "We received your request." },
   { key: "matched", label: "Driver matched", description: "A driver was assigned to you." },
-  { key: "confirmed", label: "Confirmed", description: "The driver accepted the trip." },
+  { key: "confirmed", label: "Driver chosen", description: "You picked a driver for the trip." },
   { key: "in_progress", label: "On the way", description: "Your driver is heading to pickup." },
   { key: "completed", label: "Completed", description: "You have arrived." },
 ];
@@ -46,10 +50,14 @@ export default function RideDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const rideId = params.id;
+  const { user } = useAuth();
 
   const [ride, setRide] = useState<Ride | null>(null);
   const [match, setMatch] = useState<MatchResult | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<DriverCandidate[]>([]);
+  const [candidatesError, setCandidatesError] = useState<string | null>(null);
+  const [pickingDriverId, setPickingDriverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -99,6 +107,41 @@ export default function RideDetailPage() {
 
     return () => clearInterval(timer);
   }, [ride, load]);
+
+  /**
+   * The interested-driver list is only readable by the rider who booked the
+   * ride, so it is fetched separately and any refusal is silently ignored —
+   * a driver opening someone else's ride simply sees no candidates.
+   */
+  const loadCandidates = useCallback(async () => {
+    try {
+      setCandidates(await fetchInterestedDrivers(rideId));
+      setCandidatesError(null);
+    } catch {
+      setCandidates([]);
+      setCandidatesError(null);
+    }
+  }, [rideId]);
+
+  useEffect(() => {
+    if (user) void loadCandidates();
+  }, [user, loadCandidates]);
+
+  async function handlePick(driverId: string) {
+    setPickingDriverId(driverId);
+    setCancelError(null);
+    try {
+      const updated = await pickDriver(rideId, driverId);
+      setRide(updated);
+      await loadCandidates();
+    } catch (pickError) {
+      setCancelError(
+        pickError instanceof Error ? pickError.message : "Could not choose this driver."
+      );
+    } finally {
+      setPickingDriverId(null);
+    }
+  }
 
   async function handleCancel() {
     if (!ride) return;
@@ -183,6 +226,61 @@ export default function RideDetailPage() {
               </div>
             </div>
           </Card>
+
+          {ride.status === "requested" && candidates.length > 0 && (
+            <Card>
+              <CardHeader
+                title="Choose your driver"
+                description="These drivers volunteered for your ride, best match first."
+              />
+              <ul className="divide-y divide-slate-100">
+                {candidates.map((candidate, index) => (
+                  <li key={candidate.driver_id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900">
+                          {candidate.full_name || "Driver"}
+                        </p>
+                        {index === 0 && candidate.score != null && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                            Best match
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {[candidate.vehicle_color, candidate.vehicle_make, candidate.vehicle_model]
+                          .filter(Boolean)
+                          .join(" ") || "Vehicle not set"}
+                        {candidate.vehicle_plate ? ` · ${candidate.vehicle_plate}` : ""}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {candidate.seats_offered} seat
+                        {candidate.seats_offered === 1 ? "" : "s"}
+                        {candidate.pickup_km != null
+                          ? ` · ${candidate.pickup_km.toFixed(1)} km away`
+                          : ""}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      loading={pickingDriverId === candidate.driver_id}
+                      disabled={pickingDriverId !== null}
+                      onClick={() => void handlePick(candidate.driver_id)}
+                    >
+                      Choose
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {ride.status === "requested" && candidates.length === 0 && !candidatesError && (
+            <Alert variant="info">
+              No drivers have volunteered yet. You&apos;ll be notified as soon as
+              one does — your ride is listed and visible to nearby drivers.
+            </Alert>
+          )}
 
           {canCancel && (
             <Card className="p-5">
@@ -272,11 +370,11 @@ export default function RideDetailPage() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Driver</span>
                 <span className="font-mono text-xs">
-                  {ride.matched_driver_id ?? match?.driver_id ?? "—"}
+                  {ride.matched_driver_id ?? "Not chosen yet"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Match score</span>
+                <span className="text-slate-600">Best available score</span>
                 <span className="font-mono text-xs">
                   {match?.score != null ? match.score.toFixed(3) : "—"}
                 </span>

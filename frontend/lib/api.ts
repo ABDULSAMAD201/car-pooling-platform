@@ -78,6 +78,35 @@ export interface User {
   created_at: string;
 }
 
+export interface OpenRequest extends Ride {
+  /** Name of the rider who booked it. Phone is withheld until they pick a driver. */
+  rider_name: string;
+}
+
+export interface RideInterest {
+  ride_id: string;
+  driver_id: string;
+  score: number | null;
+  pickup_km: number | null;
+  bearing_diff: number | null;
+}
+
+/** An interested driver as shown to the rider deciding who to travel with. */
+export interface DriverCandidate {
+  driver_id: string;
+  full_name: string;
+  phone: string;
+  vehicle_make: string;
+  vehicle_model: string;
+  vehicle_color: string;
+  vehicle_plate: string;
+  seats_offered: number;
+  score: number | null;
+  pickup_km: number | null;
+  bearing_diff: number | null;
+  interested_at: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: string;
@@ -201,6 +230,56 @@ export async function fetchRide(rideId: string): Promise<Ride> {
 
 export async function fetchMyRides(): Promise<Ride[]> {
   return request<Ride[]>("/rides/mine", undefined, undefined, { auth: true });
+}
+
+/** Unassigned rides the signed-in driver can volunteer for. */
+export async function fetchOpenRequests(): Promise<OpenRequest[]> {
+  return request<OpenRequest[]>("/rides/requests", undefined, undefined, { auth: true });
+}
+
+/** Rides this driver has put themselves forward for. */
+export async function fetchMyInterests(): Promise<Ride[]> {
+  return request<Ride[]>("/rides/mine/interested", undefined, undefined, { auth: true });
+}
+
+/** Put the signed-in driver forward for a ride. Idempotent. */
+export async function expressInterest(rideId: string): Promise<RideInterest> {
+  return request<RideInterest>(
+    `/rides/${encodeURIComponent(rideId)}/interest`,
+    { method: "POST" },
+    undefined,
+    { auth: true }
+  );
+}
+
+/** Withdraw interest before the rider chooses somebody. */
+export async function withdrawInterest(rideId: string): Promise<void> {
+  await request<void>(
+    `/rides/${encodeURIComponent(rideId)}/interest`,
+    { method: "DELETE" },
+    undefined,
+    { auth: true }
+  );
+}
+
+/** Drivers who volunteered for this ride. Only the rider who booked it can read this. */
+export async function fetchInterestedDrivers(rideId: string): Promise<DriverCandidate[]> {
+  return request<DriverCandidate[]>(
+    `/rides/${encodeURIComponent(rideId)}/candidates`,
+    undefined,
+    undefined,
+    { auth: true }
+  );
+}
+
+/** The rider choosing which interested driver takes the ride. */
+export async function pickDriver(rideId: string, driverId: string): Promise<Ride> {
+  return request<Ride>(
+    `/rides/${encodeURIComponent(rideId)}/pick`,
+    { method: "POST", body: JSON.stringify({ driver_id: driverId }) },
+    undefined,
+    { auth: true }
+  );
 }
 
 export async function cancelRide(rideId: string): Promise<Ride> {

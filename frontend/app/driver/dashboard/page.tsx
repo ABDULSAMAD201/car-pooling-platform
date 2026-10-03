@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  expressInterest,
   fetchDriverAvailability,
-  fetchMyRides,
+  fetchMyInterests,
+  fetchOpenRequests,
+  withdrawInterest,
   type DriverAvailability,
+  type OpenRequest,
   type Ride,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -31,7 +35,7 @@ const MAX_BEARING_DIFF_DEGREES = 45;
 const REFRESH_INTERVAL_MS = 10_000;
 
 interface Candidate {
-  ride: Ride;
+  ride: OpenRequest | Ride;
   pickupKm: number;
   bearingDiff: number;
   eligible: boolean;
@@ -42,7 +46,7 @@ interface Candidate {
  * Evaluate a ride against the driver's registered route using the same rules
  * the matching service applies, so the dashboard can explain each decision.
  */
-function evaluate(ride: Ride, availability: DriverAvailability | null): Candidate | null {
+function evaluate(ride: OpenRequest | Ride, availability: DriverAvailability | null): Candidate | null {
   if (!availability) return null;
 
   const driverBearing = bearing(
@@ -90,20 +94,25 @@ function DriverDashboard() {
   const { user, loading: authLoading } = useAuth();
 
   const [availability, setAvailability] = useState<DriverAvailability | null>(null);
-  const [rides, setRides] = useState<Ride[]>([]);
+  const [requests, setRequests] = useState<OpenRequest[]>([]);
+  const [interestedRides, setInterestedRides] = useState<Ride[]>([]);
+  const [pendingRideId, setPendingRideId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const [drivers, myRides] = await Promise.all([
+      const [drivers, openRequests, myInterests] = await Promise.all([
         fetchDriverAvailability(true),
-        fetchMyRides(),
+        fetchOpenRequests(),
+        fetchMyInterests(),
       ]);
       const mine = drivers.find((item) => item.driver_id === user.id) ?? null;
       setAvailability(mine);
-      setRides(myRides);
+      setRequests(openRequests);
+      setInterestedRides(myInterests);
       setError(null);
     } catch (loadError) {
       setError(
@@ -113,6 +122,39 @@ function DriverDashboard() {
       setLoading(false);
     }
   }, [user]);
+
+  const interestedIds = useMemo(
+    () => new Set(interestedRides.map((ride) => ride.id)),
+    [interestedRides]
+  );
+
+  /**
+   * Volunteer for, or pull back from, a ride. The request row is disabled while
+   * this is in flight so a double-click cannot send the same call twice.
+   */
+  const toggleInterest = useCallback(
+    async (rideId: string, currentlyInterested: boolean) => {
+      setPendingRideId(rideId);
+      setActionError(null);
+      try {
+        if (currentlyInterested) {
+          await withdrawInterest(rideId);
+        } else {
+          await expressInterest(rideId);
+        }
+        await load();
+      } catch (toggleError) {
+        setActionError(
+          toggleError instanceof Error
+            ? toggleError.message
+            : "Could not update your interest."
+        );
+      } finally {
+        setPendingRideId(null);
+      }
+    },
+    [load]
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -129,9 +171,12 @@ function DriverDashboard() {
     return () => clearInterval(timer);
   }, [user, load]);
 
-  const openRides = useMemo(
-    () => rides.filter((ride) => ["requested", "matched", "confirmed"].includes(ride.status)),
-    [rides]
+  const myAcceptedRides = useMemo(
+    () =>
+      interestedRides.filter((ride) =>
+        ["confirmed", "in_progress", "completed"].includes(ride.status)
+      ),
+    [interestedRides]
   );
 
   const online = availability?.is_active ?? false;
@@ -173,7 +218,13 @@ function DriverDashboard() {
             </div>
           )}
 
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {actionError && (
+            <div className="mb-4">
+              <Alert>{actionError}</Alert>
+            </div>
+          )}
+
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Card className="p-5">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                 Status
@@ -209,7 +260,16 @@ function DriverDashboard() {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                 Open requests
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{openRides.length}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{requests.length}</p>
+            </Card>
+
+            <Card className="p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Your trips
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {myAcceptedRides.length}
+              </p>
             </Card>
           </div>
 
@@ -217,8 +277,12 @@ function DriverDashboard() {
             <div className="space-y-6">
               <Card>
                 <CardHeader
-                  title="Ride requests"
-                  description="Eligibility mirrors the matching service's own rules."
+                  title="Available rides"
+                  description={
+                    online
+                      ? "Volunteer for a ride and the rider will choose from everyone interested."
+                      : "You're offline. Go online to volunteer for rides."
+                  }
                   action={
                     <Button size="sm" variant="ghost" onClick={() => void load()}>
                       Refresh
@@ -230,13 +294,13 @@ function DriverDashboard() {
                   <div className="flex items-center justify-center py-16">
                     <Spinner className="h-6 w-6 text-indigo-600" />
                   </div>
-                ) : openRides.length === 0 ? (
+                ) : requests.length === 0 ? (
                   <EmptyState
-                    title="No open requests"
+                    title="No open rides"
                     description={
                       online
-                        ? "When riders request trips heading your way, they'll show up here."
-                        : "Go online from the driver page to start receiving requests."
+                        ? "When riders request trips, they'll show up here for you to volunteer for."
+                        : "Go online from the driver page to start receiving rides."
                     }
                     action={
                       !online ? (
@@ -248,8 +312,10 @@ function DriverDashboard() {
                   />
                 ) : (
                   <ul className="divide-y divide-slate-100">
-                    {openRides.map((ride) => {
+                    {requests.map((ride) => {
                       const candidate = evaluate(ride, availability);
+                      const interested = interestedIds.has(ride.id);
+                      const pending = pendingRideId === ride.id;
                       return (
                         <li key={ride.id} className="p-5">
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -268,15 +334,29 @@ function DriverDashboard() {
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-2 break-all font-mono text-xs text-slate-500">
+                              <p className="mt-2 text-sm font-medium text-slate-900">
+                                {ride.rider_name || "A rider"}
+                              </p>
+                              <p className="mt-0.5 break-all font-mono text-xs text-slate-500">
                                 {ride.id}
                               </p>
                             </div>
-                            <Link href={`/rides/${ride.id}`}>
-                              <Button size="sm" variant="secondary">
-                                View
+                            <div className="flex shrink-0 gap-2">
+                              <Link href={`/rides/${ride.id}`}>
+                                <Button size="sm" variant="secondary">
+                                  View
+                                </Button>
+                              </Link>
+                              <Button
+                                size="sm"
+                                variant={interested ? "ghost" : "primary"}
+                                loading={pending}
+                                disabled={!online}
+                                onClick={() => void toggleInterest(ride.id, interested)}
+                              >
+                                {interested ? "Withdraw" : "I'm interested"}
                               </Button>
-                            </Link>
+                            </div>
                           </div>
 
                           {candidate && (
@@ -305,6 +385,12 @@ function DriverDashboard() {
                               </div>
                             </div>
                           )}
+
+                          {interested && (
+                            <p className="mt-3 text-xs font-medium text-indigo-600">
+                              Waiting for the rider to choose — they may pick somebody else.
+                            </p>
+                          )}
                         </li>
                       );
                     })}
@@ -313,15 +399,15 @@ function DriverDashboard() {
               </Card>
 
               <Card>
-                <CardHeader title="Recent trips" />
-                {rides.length === 0 ? (
+                <CardHeader title="Your trips" description="Rides you volunteered for, newest first." />
+                {interestedRides.length === 0 ? (
                   <EmptyState
                     title="No trips yet"
-                    description="Trips you're matched to will be listed here."
+                    description="Rides you volunteer for will be listed here."
                   />
                 ) : (
                   <ul className="divide-y divide-slate-100">
-                    {rides.slice(0, 5).map((ride) => (
+                    {interestedRides.slice(0, 8).map((ride) => (
                       <li key={ride.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
                         <div className="min-w-0">
                           <p className="truncate font-mono text-xs text-slate-600">{ride.id}</p>

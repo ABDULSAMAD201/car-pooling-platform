@@ -59,3 +59,23 @@ class Ride(SQLModel, table=True):
     matched_ride_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RideInterest(SQLModel, table=True):
+    """A driver volunteering to take a ride that has not been assigned yet.
+
+    Drivers express interest and the rider chooses from the interested pool, so
+    a ride only gets a `matched_driver_id` once somebody has accepted it. The
+    score is snapshotted from the matching service at the moment of interest so
+    the rider's list can be ranked without re-scoring every candidate later.
+    """
+
+    __tablename__ = "ride_interest"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+    ride_id: str = Field(index=True)
+    driver_id: str = Field(index=True)
+    score: float | None = None
+    pickup_km: float | None = None
+    bearing_diff: float | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)

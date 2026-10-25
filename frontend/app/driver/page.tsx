@@ -212,12 +212,12 @@ function DriverAvailability() {
                 </div>
               </div>
               <div className="ml-3 h-3 w-px bg-slate-300" />
-              <div className="flex items-start gap-3 rounded-lg border border-indigo-300 bg-indigo-50/60 p-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+              <div className="flex items-start gap-3 rounded-lg border border-brand-300 bg-brand-50/60 p-3">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
                   B
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                  <p className="text-xs font-medium uppercase tracking-wide text-brand-700">
                     Destination
                   </p>
                   <p className="truncate font-mono text-xs text-slate-900">

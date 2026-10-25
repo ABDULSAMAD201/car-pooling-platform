@@ -201,7 +201,7 @@ function DriverDashboard() {
 
       {authLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Spinner className="h-6 w-6 text-indigo-600" />
+          <Spinner className="h-6 w-6 text-brand-600" />
         </div>
       ) : !user ? (
         <Card className="p-8 text-center">
@@ -292,7 +292,7 @@ function DriverDashboard() {
 
                 {loading ? (
                   <div className="flex items-center justify-center py-16">
-                    <Spinner className="h-6 w-6 text-indigo-600" />
+                    <Spinner className="h-6 w-6 text-brand-600" />
                   </div>
                 ) : requests.length === 0 ? (
                   <EmptyState
@@ -337,9 +337,7 @@ function DriverDashboard() {
                               <p className="mt-2 text-sm font-medium text-slate-900">
                                 {ride.rider_name || "A rider"}
                               </p>
-                              <p className="mt-0.5 break-all font-mono text-xs text-slate-500">
-                                {ride.id}
-                              </p>
+                              <p className="mt-0.5 text-xs text-slate-500">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
                             </div>
                             <div className="flex shrink-0 gap-2">
                               <Link href={`/rides/${ride.id}`}>
@@ -387,7 +385,7 @@ function DriverDashboard() {
                           )}
 
                           {interested && (
-                            <p className="mt-3 text-xs font-medium text-indigo-600">
+                            <p className="mt-3 text-xs font-medium text-brand-600">
                               Waiting for the rider to choose — they may pick somebody else.
                             </p>
                           )}
@@ -410,7 +408,7 @@ function DriverDashboard() {
                     {interestedRides.slice(0, 8).map((ride) => (
                       <li key={ride.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
                         <div className="min-w-0">
-                          <p className="truncate font-mono text-xs text-slate-600">{ride.id}</p>
+                          <p className="truncate text-sm font-medium text-slate-900">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {new Date(ride.requested_time).toLocaleString()}
                           </p>
@@ -419,7 +417,7 @@ function DriverDashboard() {
                           <StatusBadge status={ride.status} />
                           <Link
                             href={`/rides/${ride.id}`}
-                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                            className="text-xs font-semibold text-brand-600 hover:text-brand-700"
                           >
                             View
                           </Link>

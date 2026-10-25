@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
@@ -135,3 +136,38 @@ def update_me(
     session.commit()
     session.refresh(current_user)
     return UserResponse.from_user(current_user)
+
+class PublicProfile(BaseModel):
+    """What one signed-in user may see about another: a name and a car, nothing private."""
+
+    id: str
+    full_name: str = ""
+    vehicle: str = ""
+
+
+@router.get("/users/lookup", response_model=list[PublicProfile])
+def lookup_users(
+    ids: str = Query(..., description="Comma-separated user ids (max 50)."),
+    _: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> list[PublicProfile]:
+    wanted: list[UUID] = []
+    for raw in ids.split(",")[:50]:
+        try:
+            wanted.append(UUID(raw.strip()))
+        except ValueError:
+            continue
+    if not wanted:
+        return []
+
+    users = session.exec(select(User).where(User.id.in_(wanted))).all()
+    return [
+        PublicProfile(
+            id=str(user.id),
+            full_name=user.full_name,
+            vehicle=" ".join(
+                part for part in (user.vehicle_color, user.vehicle_make, user.vehicle_model) if part
+            ),
+        )
+        for user in users
+    ]

@@ -66,4 +66,54 @@ def find_match(ride_request: dict, available_drivers: list[dict]) -> dict | None
         return None
 
     best = min(candidates, key=lambda c: c["score"])
-    return {"driver_id": best["driver"]["driver_id"], "score": best["score"]}
+    return {"driver_id": best["driver"]["driver_id"], "score": best["score"]}
+
+
+def score_driver(ride_request: dict, driver: dict) -> dict | None:
+    """Evaluate one driver against one ride.
+
+    Returns the pickup distance, bearing difference and combined score, or None
+    when the driver is outside the pickup radius or heading a different way.
+    Used when a driver volunteers for a ride so their interest can be ranked
+    against the other interested drivers.
+    """
+    pickup_km = haversine_distance_km(
+        driver["current_lat"], driver["current_lng"],
+        ride_request["origin"]["lat"], ride_request["origin"]["lng"],
+    )
+    if pickup_km > MAX_PICKUP_RADIUS_KM:
+        return None
+
+    rider_bearing = calculate_bearing(
+        ride_request["origin"]["lat"], ride_request["origin"]["lng"],
+        ride_request["destination"]["lat"], ride_request["destination"]["lng"],
+    )
+    driver_bearing = calculate_bearing(
+        driver["current_lat"], driver["current_lng"],
+        driver["destination_lat"], driver["destination_lng"],
+    )
+    bearing_diff = bearing_difference(rider_bearing, driver_bearing)
+    if bearing_diff > MAX_BEARING_DIFF_DEGREES:
+        return None
+
+    score = (pickup_km * DISTANCE_WEIGHT) + ((bearing_diff / 180) * DIRECTION_WEIGHT)
+    return {
+        "driver_id": driver["driver_id"],
+        "score": score,
+        "pickup_km": pickup_km,
+        "bearing_diff": bearing_diff,
+    }
+
+
+def rank_drivers(ride_request: dict, available_drivers: list[dict]) -> list[dict]:
+    """Every eligible driver for a ride, best score first.
+
+    Ties are broken by driver_id so the ordering is stable across requests.
+    """
+    scored = [
+        result
+        for result in (score_driver(ride_request, driver) for driver in available_drivers)
+        if result is not None
+    ]
+    scored.sort(key=lambda item: (item["score"], item["driver_id"]))
+    return scored

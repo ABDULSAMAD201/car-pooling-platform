@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchMyRides, type Ride } from "@/lib/api";
+import { useUserProfiles } from "@/lib/use-user-names";
 import { useAuth } from "@/lib/auth-context";
 import { ClientOnlyMap } from "@/components/location-map";
 import {
@@ -32,11 +33,11 @@ function isActive(ride: Ride): boolean {
   return ACTIVE_STATUSES.has(ride.status);
 }
 
-function RideCard({ ride }: { ride: Ride }) {
+function RideCard({ ride, driverName }: { ride: Ride; driverName: string }) {
   return (
     <Link
       href={`/rides/${ride.id}`}
-      className="block rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-indigo-300"
+      className="block rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-brand-300"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -49,7 +50,7 @@ function RideCard({ ride }: { ride: Ride }) {
             </span>
           </div>
           <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-900">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
               B
             </span>
             <span className="truncate font-mono text-xs text-slate-600">
@@ -63,7 +64,7 @@ function RideCard({ ride }: { ride: Ride }) {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
         <span>Requested {formatDateTime(ride.requested_time)}</span>
         {ride.matched_driver_id && (
-          <span className="font-mono">Driver {ride.matched_driver_id.slice(0, 8)}…</span>
+          <span className="font-medium text-slate-700">Driver: {driverName}</span>
         )}
       </div>
     </Link>
@@ -73,6 +74,7 @@ function RideCard({ ride }: { ride: Ride }) {
 export default function RidesPage() {
   const { user, loading: authLoading } = useAuth();
   const [rides, setRides] = useState<Ride[]>([]);
+  const { nameOf } = useUserProfiles(rides.map((ride) => ride.matched_driver_id));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -112,7 +114,7 @@ export default function RidesPage() {
   if (authLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Spinner className="h-6 w-6 text-indigo-600" />
+        <Spinner className="h-6 w-6 text-brand-600" />
       </div>
     );
   }
@@ -153,7 +155,7 @@ export default function RidesPage() {
                   onClick={() => setFilter(value)}
                   className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
                     filter === value
-                      ? "bg-indigo-600 text-white"
+                      ? "bg-brand-600 text-white"
                       : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
                   }`}
                 >
@@ -170,7 +172,7 @@ export default function RidesPage() {
 
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <Spinner className="h-6 w-6 text-indigo-600" />
+                <Spinner className="h-6 w-6 text-brand-600" />
               </div>
             ) : visible.length === 0 ? (
               <Card>
@@ -193,7 +195,7 @@ export default function RidesPage() {
             ) : (
               <div className="space-y-3">
                 {visible.map((ride) => (
-                  <RideCard key={ride.id} ride={ride} />
+                  <RideCard key={ride.id} ride={ride} driverName={nameOf(ride.matched_driver_id)} />
                 ))}
               </div>
             )}

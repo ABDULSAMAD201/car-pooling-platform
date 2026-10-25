@@ -362,3 +362,18 @@ export async function fetchNotifications(userId: string): Promise<Notification[]
     notifyBaseUrl()
   );
 }
+export interface PublicProfile {
+  id: string;
+  full_name: string;
+  vehicle: string;
+}
+
+export async function lookupUsers(ids: string[]): Promise<PublicProfile[]> {
+  if (ids.length === 0) return [];
+  return request<PublicProfile[]>(
+    `/auth/users/lookup?ids=${ids.map(encodeURIComponent).join(",")}`,
+    undefined,
+    undefined,
+    { auth: true }
+  );
+}

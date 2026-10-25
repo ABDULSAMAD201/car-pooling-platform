@@ -85,7 +85,7 @@ export default function NotificationsPage() {
         </Card>
       ) : loading ? (
         <div className="flex items-center justify-center py-20">
-          <Spinner className="h-6 w-6 text-indigo-600" />
+          <Spinner className="h-6 w-6 text-brand-600" />
         </div>
       ) : items.length === 0 ? (
         <Card>
@@ -99,7 +99,7 @@ export default function NotificationsPage() {
           <ul className="divide-y divide-slate-100">
             {items.map((item) => (
               <li key={item.id} className="flex gap-3 p-4">
-                <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
                   <svg
                     className="h-4 w-4"
                     viewBox="0 0 20 20"
@@ -116,7 +116,7 @@ export default function NotificationsPage() {
                     {item.ride_id && (
                       <Link
                         href={`/rides/${item.ride_id}`}
-                        className="font-semibold text-indigo-600 hover:text-indigo-700"
+                        className="font-semibold text-brand-600 hover:text-brand-700"
                       >
                         View ride
                       </Link>

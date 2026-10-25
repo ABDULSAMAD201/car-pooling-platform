@@ -69,8 +69,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-12">
+    <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-12 sm:py-16">
       <div className="mb-8 text-center">
+        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-sm">
+          C
+        </span>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Create your account</h1>
         <p className="mt-2 text-sm text-slate-500">
           Join Carpool to book rides or share your commute.
@@ -170,7 +173,7 @@ export default function SignupPage() {
 
       <p className="mt-6 text-center text-sm text-slate-600">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+        <Link href="/login" className="font-semibold text-brand-600 hover:text-brand-700">
           Sign in
         </Link>
       </p>

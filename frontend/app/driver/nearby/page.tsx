@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { fetchDriverAvailability, type DriverAvailability } from "@/lib/api";
+import { useUserProfiles } from "@/lib/use-user-names";
 import { useAuth } from "@/lib/auth-context";
 import { RequirePortal } from "@/components/portal-guard";
 import { Alert, Button, Card, EmptyState, PageHeader, Spinner } from "@/components/ui";
@@ -19,6 +20,7 @@ export default function DriversNearbyPage() {
 function DriversNearby() {
   const { user } = useAuth();
   const [drivers, setDrivers] = useState<DriverAvailability[]>([]);
+  const { nameOf } = useUserProfiles(drivers.map((driver) => driver.driver_id));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +66,7 @@ function DriversNearby() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Spinner className="h-6 w-6 text-indigo-600" />
+          <Spinner className="h-6 w-6 text-brand-600" />
         </div>
       ) : drivers.length === 0 ? (
         <Card>
@@ -85,8 +87,8 @@ function DriversNearby() {
             return (
               <Card key={driver.id} className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-xs text-slate-500">
-                    {isMe ? "You" : `${driver.driver_id.slice(0, 8)}…`}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {nameOf(driver.driver_id, user?.id)}
                   </p>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />

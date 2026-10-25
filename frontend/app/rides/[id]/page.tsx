@@ -14,6 +14,7 @@ import {
   type MatchResult,
   type Ride,
 } from "@/lib/api";
+import { useUserProfiles } from "@/lib/use-user-names";
 import { useAuth } from "@/lib/auth-context";
 import { ClientOnlyMap } from "@/components/location-map";
 import {
@@ -62,6 +63,7 @@ export default function RideDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const { nameOf } = useUserProfiles([ride?.matched_driver_id, ...candidates.map((c) => c.driver_id)]);
 
   const cancelledRef = useRef(false);
 
@@ -161,7 +163,7 @@ export default function RideDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Spinner className="h-6 w-6 text-indigo-600" />
+        <Spinner className="h-6 w-6 text-brand-600" />
       </div>
     );
   }
@@ -194,7 +196,7 @@ export default function RideDetailPage() {
       <div className="mb-6 mt-3 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ride details</h1>
-          <p className="mt-1 break-all font-mono text-xs text-slate-500">{ride.id}</p>
+          <p className="mt-1 text-sm text-slate-500">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
         </div>
         <StatusBadge status={ride.status} />
       </div>
@@ -324,7 +326,7 @@ export default function RideDetailPage() {
                           done
                             ? "bg-emerald-600 text-white"
                             : current
-                              ? "bg-indigo-600 text-white ring-4 ring-indigo-100"
+                              ? "bg-brand-600 text-white ring-4 ring-brand-100"
                               : "bg-slate-200 text-slate-500"
                         }`}
                       >
@@ -369,8 +371,8 @@ export default function RideDetailPage() {
             <div className="space-y-3 p-5 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Driver</span>
-                <span className="font-mono text-xs">
-                  {ride.matched_driver_id ?? "Not chosen yet"}
+                <span className="font-medium text-slate-900">
+                  {ride?.matched_driver_id ? nameOf(ride.matched_driver_id) : "Not chosen yet"}
                 </span>
               </div>
               <div className="flex items-center justify-between">

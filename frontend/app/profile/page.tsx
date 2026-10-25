@@ -70,7 +70,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Spinner className="h-6 w-6 text-indigo-600" />
+        <Spinner className="h-6 w-6 text-brand-600" />
       </div>
     );
   }
@@ -204,7 +204,7 @@ export default function ProfilePage() {
 
         <div className="space-y-6">
           <Card className="p-5">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-xl font-bold text-indigo-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-700">
               {(user.full_name || user.email).slice(0, 2).toUpperCase()}
             </div>
             <p className="mt-3 font-semibold text-slate-900">{user.full_name || "Your account"}</p>

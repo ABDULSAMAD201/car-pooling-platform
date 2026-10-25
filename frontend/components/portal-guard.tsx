@@ -51,7 +51,7 @@ export function RequirePortal({
   if (loading || !user || !allowed) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Spinner className="h-6 w-6 text-indigo-600" />
+        <Spinner className="h-6 w-6 text-brand-600" />
       </div>
     );
   }

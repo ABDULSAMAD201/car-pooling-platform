@@ -43,8 +43,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-12">
+    <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-12 sm:py-16">
       <div className="mb-8 text-center">
+        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-sm">
+          C
+        </span>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back</h1>
         <p className="mt-2 text-sm text-slate-500">Sign in to book and manage your rides.</p>
       </div>
@@ -87,7 +90,7 @@ function LoginForm() {
 
       <p className="mt-6 text-center text-sm text-slate-600">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-700">
+        <Link href="/signup" className="font-semibold text-brand-600 hover:text-brand-700">
           Create one
         </Link>
       </p>

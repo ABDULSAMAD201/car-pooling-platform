@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-lg font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
               C
             </span>
             <span className="hidden text-lg font-bold tracking-tight text-slate-900 sm:block">
@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setChosenPortal(portal)}
                   className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                     activePortal === portal
-                      ? "bg-white text-indigo-700 shadow-sm"
+                      ? "bg-white text-brand-700 shadow-sm"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -114,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={link.href}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   isActive(pathname, link.href)
-                    ? "bg-indigo-50 text-indigo-700"
+                    ? "bg-brand-50 text-brand-700"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
@@ -133,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   aria-haspopup="menu"
                   className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition hover:bg-slate-100"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
                     {initialsFor(user.full_name, user.email)}
                   </span>
                   <span className="hidden max-w-[10rem] truncate text-sm font-medium text-slate-700 sm:block">
@@ -224,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Mobile navigation */}
         <nav className="flex flex-wrap items-center gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden">
           {visiblePortals.length > 1 && (
-            <span className="mr-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+            <span className="mr-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
               {PORTAL_LABEL[activePortal]}
             </span>
           )}
@@ -234,7 +234,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               href={link.href}
               className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 isActive(pathname, link.href)
-                  ? "bg-indigo-50 text-indigo-700"
+                  ? "bg-brand-50 text-brand-700"
                   : "text-slate-600"
               }`}
             >
@@ -247,8 +247,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="flex-1">{children}</main>
 
       <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
-          <p>Carpool — share rides, split costs, travel better.</p>
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>© {new Date().getFullYear()} Carpool — share rides, split costs.</p>
+          <nav className="flex gap-4">
+            <Link href="/" className="hover:text-slate-900">Home</Link>
+            <Link href="/rides" className="hover:text-slate-900">My rides</Link>
+            <Link href="/notifications" className="hover:text-slate-900">Notifications</Link>
+          </nav>
         </div>
       </footer>
     </div>

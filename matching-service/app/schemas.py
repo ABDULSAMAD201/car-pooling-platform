@@ -86,3 +86,21 @@ class MatchDecision(BaseModel):
     matched: bool
     driver_id: str | None = None
     match_id: UUID | None = None
+
+
+class RideLookup(BaseModel):
+    """Ask how well each active driver fits an existing ride.
+
+    Used to show a driver their eligibility before they volunteer, and to
+    score their interest once they do. Does not assign anybody.
+    """
+
+    origin: Location
+    destination: Location
+
+
+class DriverCandidate(BaseModel):
+    driver_id: str
+    score: float
+    pickup_km: float
+    bearing_diff: float

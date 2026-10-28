@@ -38,3 +38,29 @@ Thumbs.db
 # Local OAuth tokens (Doop MCP)
 .doop/
 
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Logs and local process files
+*.log
+*.pid
+.tmp-logs/
+
+# GitHub self-hosted runner (contains credentials and binaries)
+actions-runner/
+
+# Local tool / agent config
+.agents/
+.freebuff/
+.doop/
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx

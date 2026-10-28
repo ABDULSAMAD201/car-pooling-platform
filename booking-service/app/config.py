@@ -5,13 +5,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env.example",
+        env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
-    DATABASE_URL: str = "postgresql://booking-service_owner:REDACTED@ep-plain-voice-a54om4ip.us-east-2.aws.neon.tech/booking-service?sslmode=require"
+    DATABASE_URL: str = "sqlite:///./local.db"
     MATCHING_SERVICE_URL: str = "http://localhost:8001"
     NOTIFY_SERVICE_URL: str = "http://localhost:8002"
     CORS_ORIGINS: str = "http://localhost:3000"

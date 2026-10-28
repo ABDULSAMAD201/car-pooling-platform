@@ -63,8 +63,10 @@ function RideCard({ ride, driverName }: { ride: Ride; driverName: string }) {
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
         <span>Requested {formatDateTime(ride.requested_time)}</span>
-        {ride.matched_driver_id && (
-          <span className="font-medium text-slate-700">Driver: {driverName}</span>
+        {ride.matched_driver_id ? (
+          <span className="font-medium text-brand-700">Your driver: {driverName}</span>
+        ) : ride.status === "cancelled" ? null : (
+          <span className="font-medium text-amber-700">Waiting for a driver</span>
         )}
       </div>
     </Link>

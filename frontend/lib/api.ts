@@ -366,6 +366,7 @@ export interface PublicProfile {
   id: string;
   full_name: string;
   vehicle: string;
+  vehicle_plate: string;
 }
 
 export async function lookupUsers(ids: string[]): Promise<PublicProfile[]> {

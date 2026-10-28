@@ -17,6 +17,7 @@ import {
 import { useUserProfiles } from "@/lib/use-user-names";
 import { useAuth } from "@/lib/auth-context";
 import { ClientOnlyMap } from "@/components/location-map";
+import { PersonRow } from "@/components/person";
 import {
   Alert,
   Button,
@@ -29,12 +30,68 @@ import {
 const POLL_INTERVAL_MS = 5000;
 
 const TIMELINE = [
-  { key: "requested", label: "Ride requested", description: "We received your request." },
-  { key: "matched", label: "Driver matched", description: "A driver was assigned to you." },
-  { key: "confirmed", label: "Driver chosen", description: "You picked a driver for the trip." },
-  { key: "in_progress", label: "On the way", description: "Your driver is heading to pickup." },
-  { key: "completed", label: "Completed", description: "You have arrived." },
+  {
+    key: "requested",
+    label: "Ride requested",
+    description: "The passenger posted this request.",
+  },
+  {
+    key: "matched",
+    label: "Driver matched",
+    description: "A driver was assigned to this ride.",
+  },
+  {
+    key: "confirmed",
+    label: "Driver chosen",
+    description: "The passenger picked a driver for the trip.",
+  },
+  {
+    key: "in_progress",
+    label: "On the way",
+    description: "The driver is heading to the pickup point.",
+  },
+  { key: "completed", label: "Completed", description: "The passenger has arrived." },
 ];
+
+type ViewerRole = "passenger" | "driver" | "visitor";
+
+/** One plain-language sentence saying what is happening and what it means for the viewer. */
+function summaryFor(
+  status: string,
+  viewer: ViewerRole,
+  driver: string | null,
+  passenger: string
+): string {
+  if (status === "cancelled") return "This ride was cancelled.";
+
+  if (viewer === "passenger") {
+    switch (status) {
+      case "requested":
+        return "Waiting for a driver. Drivers heading your way can volunteer, and you choose who picks you up.";
+      case "in_progress":
+        return `${driver ?? "Your driver"} is on the way to pick you up.`;
+      case "completed":
+        return `Your trip with ${driver ?? "your driver"} is complete.`;
+      default:
+        return `${driver ?? "Your driver"} will pick you up.`;
+    }
+  }
+
+  if (viewer === "driver") {
+    switch (status) {
+      case "in_progress":
+        return `You are on the way to pick up ${passenger}.`;
+      case "completed":
+        return `You completed this trip with ${passenger}.`;
+      default:
+        return `You are driving ${passenger}. Head to the pickup point at the requested time.`;
+    }
+  }
+
+  return status === "requested"
+    ? `${passenger} is looking for a ride. Volunteer from your dashboard and they may choose you.`
+    : `${passenger} already has a driver for this ride.`;
+}
 
 function formatDateTime(value: string): string {
   const date = new Date(value);
@@ -63,7 +120,11 @@ export default function RideDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const { nameOf } = useUserProfiles([ride?.matched_driver_id, ...candidates.map((c) => c.driver_id)]);
+  const { nameOf, profile } = useUserProfiles([
+    ride?.user_id,
+    ride?.matched_driver_id,
+    ...candidates.map((c) => c.driver_id),
+  ]);
 
   const cancelledRef = useRef(false);
 
@@ -185,7 +246,26 @@ export default function RideDetailPage() {
   }
 
   const stepIndex = timelineIndex(ride.status);
-  const canCancel = !["completed", "cancelled"].includes(ride.status);
+  const isPassenger = user?.id === ride.user_id;
+  const isMatchedDriver = !!user && user.id === ride.matched_driver_id;
+  const viewer: ViewerRole = isPassenger ? "passenger" : isMatchedDriver ? "driver" : "visitor";
+  const canCancel = isPassenger && !["completed", "cancelled"].includes(ride.status);
+
+  const passengerName = isPassenger ? (user?.full_name || "You") : nameOf(ride.user_id, undefined, "Passenger");
+  const driverProfile = profile(ride.matched_driver_id);
+  const driverName = ride.matched_driver_id ? nameOf(ride.matched_driver_id, user?.id) : null;
+  const summary = summaryFor(
+    ride.status,
+    viewer,
+    driverName === "You" ? null : driverName,
+    passengerName
+  );
+  const viewerLabel =
+    viewer === "passenger"
+      ? "You are the passenger"
+      : viewer === "driver"
+        ? "You are the driver"
+        : "You are viewing this ride";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -199,6 +279,21 @@ export default function RideDetailPage() {
           <p className="mt-1 text-sm text-slate-500">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
         </div>
         <StatusBadge status={ride.status} />
+      </div>
+
+      <div
+        className={`mb-6 rounded-2xl p-5 ring-1 ${
+          ride.status === "cancelled"
+            ? "bg-rose-50 ring-rose-600/20"
+            : viewer === "driver"
+              ? "bg-brand-50 ring-brand-600/20"
+              : viewer === "passenger"
+                ? "bg-sky-50 ring-sky-600/20"
+                : "bg-white ring-slate-200"
+        }`}
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{viewerLabel}</p>
+        <p className="mt-1 text-lg font-semibold text-slate-900">{summary}</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -229,7 +324,7 @@ export default function RideDetailPage() {
             </div>
           </Card>
 
-          {ride.status === "requested" && candidates.length > 0 && (
+          {isPassenger && ride.status === "requested" && candidates.length > 0 && (
             <Card>
               <CardHeader
                 title="Choose your driver"
@@ -277,7 +372,7 @@ export default function RideDetailPage() {
             </Card>
           )}
 
-          {ride.status === "requested" && candidates.length === 0 && !candidatesError && (
+          {isPassenger && ride.status === "requested" && candidates.length === 0 && !candidatesError && (
             <Alert variant="info">
               No drivers have volunteered yet. You&apos;ll be notified as soon as
               one does — your ride is listed and visible to nearby drivers.
@@ -288,7 +383,7 @@ export default function RideDetailPage() {
             <Card className="p-5">
               <h2 className="text-sm font-semibold text-slate-900">Need to cancel?</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Cancelling notifies your driver. Completed rides can't be cancelled.
+                Cancelling lets your driver know the trip is off. Completed rides can't be cancelled.
               </p>
               {cancelError && (
                 <div className="mt-3">
@@ -367,14 +462,33 @@ export default function RideDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Match" />
+            <CardHeader title="Who's on this ride" />
+            <div className="space-y-5 p-5">
+              <PersonRow
+                role="passenger"
+                name={passengerName}
+                isYou={isPassenger}
+                detail="Waiting to be picked up"
+              />
+              <PersonRow
+                role="driver"
+                name={driverName ?? undefined}
+                isYou={isMatchedDriver}
+                empty={isPassenger ? "Not chosen yet" : "No driver chosen yet"}
+                detail={
+                  driverProfile
+                    ? [driverProfile.vehicle, driverProfile.vehicle_plate]
+                        .filter(Boolean)
+                        .join(" · ") || "Vehicle details not set"
+                    : undefined
+                }
+              />
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Details" />
             <div className="space-y-3 p-5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Driver</span>
-                <span className="font-medium text-slate-900">
-                  {ride?.matched_driver_id ? nameOf(ride.matched_driver_id) : "Not chosen yet"}
-                </span>
-              </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Best available score</span>
                 <span className="font-mono text-xs">

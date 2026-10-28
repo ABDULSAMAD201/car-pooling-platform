@@ -36,10 +36,10 @@ export function useUserProfiles(ids: Array<string | null | undefined>) {
   return {
     profile: (id: string | null | undefined): PublicProfile | null =>
       id ? (cache.get(id) ?? null) : null,
-    nameOf: (id: string | null | undefined, selfId?: string): string => {
+    nameOf: (id: string | null | undefined, selfId?: string, label = "Driver"): string => {
       if (!id) return "";
       if (selfId && id === selfId) return "You";
-      return cache.get(id)?.full_name || `Driver #${id.slice(0, 6)}`;
+      return cache.get(id)?.full_name || `${label} #${id.slice(0, 6)}`;
     },
   };
 }

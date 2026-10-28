@@ -143,6 +143,7 @@ class PublicProfile(BaseModel):
     id: str
     full_name: str = ""
     vehicle: str = ""
+    vehicle_plate: str = ""
 
 
 @router.get("/users/lookup", response_model=list[PublicProfile])
@@ -168,6 +169,7 @@ def lookup_users(
             vehicle=" ".join(
                 part for part in (user.vehicle_color, user.vehicle_make, user.vehicle_model) if part
             ),
+            vehicle_plate=user.vehicle_plate,
         )
         for user in users
     ]

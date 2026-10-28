@@ -12,6 +12,7 @@ import {
   type OpenRequest,
   type Ride,
 } from "@/lib/api";
+import { useUserProfiles } from "@/lib/use-user-names";
 import { useAuth } from "@/lib/auth-context";
 import { bearing, bearingDifference, compassDirection, distanceKm } from "@/lib/geo";
 import { ClientOnlyMap } from "@/components/location-map";
@@ -96,6 +97,7 @@ function DriverDashboard() {
   const [availability, setAvailability] = useState<DriverAvailability | null>(null);
   const [requests, setRequests] = useState<OpenRequest[]>([]);
   const [interestedRides, setInterestedRides] = useState<Ride[]>([]);
+  const { nameOf } = useUserProfiles(interestedRides.map((ride) => ride.user_id));
   const [pendingRideId, setPendingRideId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -277,7 +279,7 @@ function DriverDashboard() {
             <div className="space-y-6">
               <Card>
                 <CardHeader
-                  title="Available rides"
+                  title="Passengers looking for a ride"
                   description={
                     online
                       ? "Volunteer for a ride and the rider will choose from everyone interested."
@@ -334,8 +336,11 @@ function DriverDashboard() {
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-2 text-sm font-medium text-slate-900">
-                                {ride.rider_name || "A rider"}
+                              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
+                                Passenger
+                              </p>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {ride.rider_name || "Unnamed passenger"}
                               </p>
                               <p className="mt-0.5 text-xs text-slate-500">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
                             </div>
@@ -397,7 +402,7 @@ function DriverDashboard() {
               </Card>
 
               <Card>
-                <CardHeader title="Your trips" description="Rides you volunteered for, newest first." />
+                <CardHeader title="Rides you volunteered for" description="Newest first. Once a passenger chooses you, you are their driver." />
                 {interestedRides.length === 0 ? (
                   <EmptyState
                     title="No trips yet"
@@ -408,8 +413,16 @@ function DriverDashboard() {
                     {interestedRides.slice(0, 8).map((ride) => (
                       <li key={ride.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">Ride #{ride.id.slice(0, 8).toUpperCase()}</p>
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {nameOf(ride.user_id, undefined, "Passenger")}
+                          </p>
                           <p className="mt-0.5 text-xs text-slate-500">
+                            {ride.matched_driver_id === user?.id
+                              ? "You are the driver"
+                              : ride.status === "requested"
+                                ? "Waiting for the passenger to choose"
+                                : "Passenger chose another driver"}
+                            {" · "}
                             {new Date(ride.requested_time).toLocaleString()}
                           </p>
                         </div>

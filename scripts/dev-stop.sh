@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Stop the local backend services started by scripts-e2e-start.sh.
+# Stop the local backend services started by scripts/dev-start.sh.
 set -u
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOGS="$ROOT/.tmp-logs"
 
 if [ -d "$LOGS" ]; then

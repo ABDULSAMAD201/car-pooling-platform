@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Local dev helper: start the three backend services for end-to-end checks.
+# Start the three backend services locally (no Docker) with SQLite databases.
+# Usage: scripts/dev-start.sh  ->  scripts/e2e-test.sh  ->  scripts/dev-stop.sh
 set -u
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/.tmp-logs"
 
 start() {

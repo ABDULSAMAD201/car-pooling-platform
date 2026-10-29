@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check against the three running services.
+# End-to-end check against the three running services (see scripts/dev-start.sh).
 set -u
 B=http://localhost:8000
 M=http://localhost:8001
@@ -68,28 +68,23 @@ step "ride list is scoped to the rider"
 curl -s "$B/rides/mine" -H "Authorization: Bearer $RTOKEN" \
   | python -c "import sys,json;d=json.load(sys.stdin);print('rides for rider:',len(d));print('all owned by rider:',all(r['user_id']=='$RID' for r in d))"
 
-step "notifications after match"
-NOTIF=$(curl -s "$N/notifications/$RID")
-echo "$NOTIF" | python -c "
-import sys,json
-d=json.load(sys.stdin)
-print('notifications:',len(d))
-for n in d[:5]: print('  -',n['message'])"
-check "match notified the rider" \
-  "$(echo "$NOTIF" | python -c "import sys,json;print(len(json.load(sys.stdin)))")" "1"
+count_notifications() {
+  curl -s "$N/notifications/$1" | python -c "import sys,json;print(len(json.load(sys.stdin)))"
+}
 
-step "cancel the ride"
-curl -s -X PATCH "$B/rides/$RIDEID/cancel" -H "Authorization: Bearer $RTOKEN" \
-  | python -c "import sys,json;print('status after cancel:',json.load(sys.stdin)['status'])"
+step "driver volunteers for the ride"
+curl -s -X POST "$B/rides/$RIDEID/interest" -H "Authorization: Bearer $DTOKEN"   | python -c "import sys,json;d=json.load(sys.stdin);print('interest recorded for ride:',d.get('ride_id'))"
+check "rider was told a driver is interested" "$(count_notifications "$RID")" "1"
 
-step "notifications after cancel"
-curl -s "$N/notifications/$RID" | python -c "
-import sys,json
-d=json.load(sys.stdin)
-print('notifications:',len(d))
-for n in d[:5]: print('  -',n['message'])"
-check "cancel notified the rider too" \
-  "$(curl -s "$N/notifications/$RID" | python -c "import sys,json;print(len(json.load(sys.stdin)))")" "2"
+step "rider chooses the driver"
+PICK=$(curl -s -X POST "$B/rides/$RIDEID/pick" -H 'Content-Type: application/json'   -H "Authorization: Bearer $RTOKEN" -d "{\"driver_id\":\"$DID\"}")
+check "ride now has the chosen driver"   "$(echo "$PICK" | python -c "import sys,json;print(json.load(sys.stdin).get('matched_driver_id'))")" "$DID"
+check "rider was told who is driving" "$(count_notifications "$RID")" "2"
+check "driver was told they were chosen" "$(count_notifications "$DID")" "1"
+
+step "rider cancels the ride"
+curl -s -X PATCH "$B/rides/$RIDEID/cancel" -H "Authorization: Bearer $RTOKEN"   | python -c "import sys,json;print('status after cancel:',json.load(sys.stdin)['status'])"
+check "driver was told the ride was cancelled" "$(count_notifications "$DID")" "2"
 
 step "unauthenticated access is rejected"
 check "GET /rides/mine without token" \
